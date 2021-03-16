@@ -1,11 +1,12 @@
-;;; rich-minority.el --- Clean-up and Beautify the list of minor-modes.
+;;; rich-minority.el --- Clean-up and Beautify the list of minor-modes.  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2014, 2015 Free Software Foundation, Inc.
 
 ;; Author: Artur Malabarba <emacs@endlessparentheses.com>
 ;; URL: https://github.com/Malabarba/rich-minority
 ;; Package-Requires: ((cl-lib "0.5"))
-;; Version: 1.0.1
+;; Version: 1.0.3
+;; License: GNU General Public License v3 or newer
 ;; Keywords: mode-line faces
 
 ;;; Commentary:
@@ -96,6 +97,8 @@ Please include your Emacs and rich-minority versions."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Customization variables.
+(define-obsolete-variable-alias 'rm-excluded-modes 'rm-blacklist "0.1.1")
+(define-obsolete-variable-alias 'rm-hidden-modes 'rm-blacklist "0.1.1")
 (defcustom rm-blacklist '(" hl-p")
   "List of minor modes you want to hide from the mode-line.
 
@@ -121,9 +124,8 @@ minor-mode lighters start with a space."
                  (regexp :tag "Regular expression."))
   :group 'rich-minority
   :package-version '(rich-minority . "0.1.1"))
-(define-obsolete-variable-alias 'rm-excluded-modes 'rm-blacklist "0.1.1")
-(define-obsolete-variable-alias 'rm-hidden-modes 'rm-blacklist "0.1.1")
 
+(define-obsolete-variable-alias 'rm-included-modes 'rm-whitelist "0.1.1")
 (defcustom rm-whitelist nil
   "List of minor modes you want to include in the mode-line.
 
@@ -148,7 +150,6 @@ minor-mode lighters start with a space."
                  (regexp :tag "Regular expression."))
   :group 'rich-minority
   :package-version '(rich-minority . "0.1.1"))
-(define-obsolete-variable-alias 'rm-included-modes 'rm-whitelist "0.1.1")
 
 (defcustom rm-text-properties
   '(("\\` Ovwrt\\'" 'face 'font-lock-warning-face))
@@ -177,16 +178,33 @@ These properties take priority over those defined in
 (defvar-local rm--help-echo nil
   "Used to set the help-echo string dynamically.")
 
+(defun rm-format-mode-line-entry (entry)
+  "Format an ENTRY of `minor-mode-alist'.
+Return a cons of the mode line string and the mode name, or nil
+if the mode line string is empty."
+  (let ((mode-symbol (car entry))
+        (mode-string (format-mode-line entry)))
+    (unless (string= mode-string "")
+      (cons mode-string mode-symbol))))
+
+(defconst rm--help-echo-spacer
+  (propertize " " 'display '(space :align-to 15)))
+
+(defun rm--help-echo-descriptor (pair)
+  (format "   %s%s(%S)" (car pair) rm--help-echo-spacer (cdr pair)))
+
 ;;;###autoload
 (defun rm--mode-list-as-string-list ()
   "Return `minor-mode-list' as a simple list of strings."
-  (let ((full-list (delete "" (mapcar #'format-mode-line minor-mode-alist))))
+  (let ((full-list (delq nil (mapcar #'rm-format-mode-line-entry
+                                     minor-mode-alist))))
     (setq rm--help-echo
-          (format "Full list:\n   %s\n\n%s"
-                  (mapconcat 'identity full-list "\n   ")
+          (format "Full list:\n%s\n\n%s"
+                  (mapconcat #'rm--help-echo-descriptor full-list "\n")
                   rm--help-echo-bottom))
     (mapcar #'rm--propertize
-            (rm--remove-hidden-modes full-list))))
+            (rm--remove-hidden-modes
+             (mapcar #'car full-list)))))
 
 (defcustom rm-base-text-properties
   '('help-echo 'rm--help-echo
